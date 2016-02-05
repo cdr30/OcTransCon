@@ -1,4 +1,5 @@
-# OcTransCon
-A tool for inferring ocean property transport convergences from knowledge of surface fluxes and depth-integrated inventories.
+# TransConv
+A tool for estimating ocean transport convergences from knowledge of surface fluxes and depth-integrated inventory changes.
+
 
 
