@@ -1,5 +1,5 @@
 """
-A tool for estimating ocean transport convergences from knowledge of surface fluxes and depth-integrated inventory changes.
+A tool for inferring ocean transport convergences from surface fluxes and depth-integrated properties.
 
 """
 
