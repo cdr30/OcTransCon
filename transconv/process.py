@@ -8,7 +8,7 @@ import numpy as np
 import scipy.signal
 import math
 
-
+import kalman
 
 import matplotlib.pyplot as plt
 
@@ -126,8 +126,10 @@ def process_basin(config, zsums, flxs, basins, areas, nbasin):
     flxs_bavg = [calc_basin_avg(cube, basins, areas, nbasin) for cube in flxs]
     
     # Low pass data
+    print len(zsums_bavg[0])
     zsums_lp = [low_pass(dat, cutoff) for dat in zsums_bavg]
     flxs_lp = [low_pass(dat, cutoff) for dat in flxs_bavg]
+    print len(zsums_lp[0])
     
     #Reference OHC data to zero at t0.
     zsums_lp = [dat - dat[0] for dat in zsums_lp]
@@ -141,15 +143,47 @@ def process_basin(config, zsums, flxs, basins, areas, nbasin):
     zsum_ob_err = calc_ermsd(zsums_lp)
     
     # Apply Kalman smoother
-    kalman.ksmooth(flx_ob, zsum_ob, flx_ob_err, zsum_ob_err)
-        
-    plt.plot(zsums_lp[0], 'r')
-    plt.plot(zsums_lp[1], 'r')
-    plt.plot(zsum_ob, 'k')
-    plt.plot(zsum_ob + zsum_ob_err * 1, 'k:')
-    plt.plot(zsum_ob - zsum_ob_err * 1, 'k:'); plt.show()
-
+    zsum_k, flx_k, tran_k, zsum_k_err, flx_k_err, tran_k_err = kalman.apply_ksmooth(
+        config, flx_ob, zsum_ob, flx_ob_err, zsum_ob_err)
     
+        
+    #plt.plot(zsums_lp[0], 'r')
+    #plt.plot(zsums_lp[1], 'r')
+    plt.plot(zsum_ob, 'k')
+    plt.plot(zsum_k, 'r')
+    plt.plot(zsum_k + zsum_k_err, 'r:')
+    plt.plot(zsum_k - zsum_k_err, 'r:')
+    #plt.plot(zsum_ob + zsum_ob_err * 1, 'k:')
+    #plt.plot(zsum_ob - zsum_ob_err * 1, 'k:'); plt.show()
+
+    plt.show()
+    
+    
+    plt.plot(flxs_bavg[0], 'k:')
+    plt.plot(flxs_bavg[1], 'k:')
+    
+    plt.plot(flxs_lp[0], 'g')
+    plt.plot(flxs_lp[1], 'g')
+    
+    #plt.plot(flx_ob, 'k')
+    plt.plot(flx_k, 'r')
+    plt.plot(flx_k + flx_k_err, 'r:')
+    plt.plot(flx_k - flx_k_err, 'r:')
+    #plt.plot(zsum_ob + zsum_ob_err * 1, 'k:')
+    #plt.plot(zsum_ob - zsum_ob_err * 1, 'k:'); plt.show()
+
+    plt.show()
+    
+        #plt.plot(zsums_lp[0], 'r')
+    #plt.plot(zsums_lp[1], 'r')
+    #plt.plot(tran_ob, 'k')
+    plt.plot(tran_k, 'r')
+    plt.plot(tran_k + tran_k_err, 'r:')
+    plt.plot(tran_k - tran_k_err, 'r:')
+    #plt.plot(zsum_ob + zsum_ob_err * 1, 'k:')
+    #plt.plot(zsum_ob - zsum_ob_err * 1, 'k:'); plt.show()
+
+    plt.show()
 
 def process_by_basin(config, zsums, flxs, basins, areas):
     """  For each basin, process data and invoke Kalman filter """

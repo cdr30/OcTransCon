@@ -23,6 +23,10 @@ def main():
     basins = load.load_geodata(config, geotype='basins')
     areas = load.load_geodata(config, geotype='areas')
     
+    print flxs[0][0]
+    print flxs[0][-1]
+    
+    
     # Process data 
     zsums, flxs, basins, areas = process.unify_masks(zsums, flxs, basins, areas)
     process.process_by_basin(config, zsums, flxs, basins, areas)
