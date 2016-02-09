@@ -1,6 +1,6 @@
 #!/usr/bin/env python2.7
 """
-Script to excute TransConv tool from the command line.
+Script to execute TransConv from the command line.
 
 """
 
