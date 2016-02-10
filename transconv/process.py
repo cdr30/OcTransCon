@@ -1,14 +1,14 @@
 """
-Module containing main routines to process data 
+Module containing routines to pre-process data and invoke Kalman filter.
 
 """
-
 
 import numpy as np
 import scipy.signal
 import math
 
 import kalman
+import save
 
 import matplotlib.pyplot as plt
 
@@ -16,6 +16,15 @@ import matplotlib.pyplot as plt
 class ShapeError(Exception):
     pass
 
+
+def return_dates(cube):
+    """ Return array of <datetime.datetime> objects. """
+    
+    tcoord = cube.coord('time')
+    dts = tcoord.units.num2date(tcoord.points)
+
+    return np.array(dts)
+    
 
 def try_append_mask(data, masks):
     """ Attempt to append data.mask to masks """
@@ -79,13 +88,18 @@ def low_pass(input_signal, cutoff):
     return output_signal[cutoff/2:-cutoff/2]
 
 
-def calc_basin_avg(cube, basins, areas, nbasin):
+def calc_basin_avg(cube, basins, areas, nbasin, total=False):
     """ Calculate area-weighted average for the specified basin. """
     
     bind = np.where(basins.data.filled() == nbasin)
     bareas = areas.data[bind[0], bind[1]]
     bdat = cube.data[:,bind[0], bind[1]]
-    bwts = bareas/bareas.sum()
+    
+    if total:
+        bwts = bareas
+    else:
+        bwts = bareas/bareas.sum()
+        
     bavg = (bwts[np.newaxis,:] * bdat).sum(axis=1)
 
     return bavg
@@ -119,82 +133,101 @@ def calc_ermsd(datalist):
 def process_basin(config, zsums, flxs, basins, areas, nbasin):
     """ Pre-process data and invoke Kalman filter for the specified basin """
     
-    cutoff = config.getint('kfilter', 'cutoff')
+    # Extract dates
+    dates = return_dates(zsums[0])
     
-    #Calc basin averages
-    zsums_bavg = [calc_basin_avg(cube, basins, areas, nbasin) for cube in zsums]
-    flxs_bavg = [calc_basin_avg(cube, basins, areas, nbasin) for cube in flxs]
-    
+    #Calc basin averages/totals
+    use_total = config.getboolean('areas', 'calc_basin_totals')
+    zsums_bavg = [calc_basin_avg(cube, basins, areas, nbasin, total=use_total) for cube in zsums]
+    flxs_bavg = [calc_basin_avg(cube, basins, areas, nbasin, total=use_total) for cube in flxs]
+
     # Low pass data
-    print len(zsums_bavg[0])
-    zsums_lp = [low_pass(dat, cutoff) for dat in zsums_bavg]
-    flxs_lp = [low_pass(dat, cutoff) for dat in flxs_bavg]
-    print len(zsums_lp[0])
+    if config.getboolean('kfilter', 'smooth'):
+        cutoff = config.getint('kfilter', 'cutoff')
+        dates = dates[cutoff/2:-cutoff/2]
+        zsums_bavg = [low_pass(dat, cutoff) for dat in zsums_bavg]
+        flxs_bavg = [low_pass(dat, cutoff) for dat in flxs_bavg]
     
-    #Reference OHC data to zero at t0.
-    zsums_lp = [dat - dat[0] for dat in zsums_lp]
+    #Reference zsum data to zero at t0.
+    zsums_bavg = [dat - dat[0] for dat in zsums_bavg]
     
     # Calculate ensemble means
-    flx_ob = calc_ensemble_mean(flxs_lp)
-    zsum_ob = calc_ensemble_mean(zsums_lp)
+    flx_ob = calc_ensemble_mean(flxs_bavg)
+    zsum_ob = calc_ensemble_mean(zsums_bavg)
     
     # Calculate obs errors
-    flx_ob_err = calc_ermsd(flxs_lp)
-    zsum_ob_err = calc_ermsd(zsums_lp)
+    flx_ob_err = calc_ermsd(flxs_bavg)
+    zsum_ob_err = calc_ermsd(zsums_bavg)
     
     # Apply Kalman smoother
-    zsum_k, flx_k, tran_k, zsum_k_err, flx_k_err, tran_k_err = kalman.apply_ksmooth(
-        config, flx_ob, zsum_ob, flx_ob_err, zsum_ob_err)
+    kout = kalman.apply_ksmooth(config, flx_ob, zsum_ob, flx_ob_err, zsum_ob_err)
     
-        
-    #plt.plot(zsums_lp[0], 'r')
-    #plt.plot(zsums_lp[1], 'r')
-    plt.plot(zsum_ob, 'k')
-    plt.plot(zsum_k, 'r')
-    plt.plot(zsum_k + zsum_k_err, 'r:')
-    plt.plot(zsum_k - zsum_k_err, 'r:')
-    #plt.plot(zsum_ob + zsum_ob_err * 1, 'k:')
-    #plt.plot(zsum_ob - zsum_ob_err * 1, 'k:'); plt.show()
+    # Write data to temporary file
+    print 'Processing basin %i' % nbasin
+    kout['dates'] = dates
+    kout['flx_ob'] = flx_ob
+    kout['zsum_ob'] = zsum_ob
+    kout['flx_ob_err'] = flx_ob_err
+    kout['zsum_ob_err'] = zsum_ob_err
+    
+    save.save_temporary_file(config, kout, nbasin)
+    
+    # Plot stuff - debugging
+    
+#     plt.plot(dates, zsum_ob, '0.5', linewidth=3)
+#     plt.plot(dates, kout['zsum_kf'], 'k')
+#     plt.plot(dates, kout['zsum_kf'] + kout['zsum_kf_err'], 'k:')
+#     plt.plot(dates, kout['zsum_kf'] - kout['zsum_kf_err'], 'k:')
+#     
+#     plt.plot(dates, kout['zsum_kb'], 'r')
+#     plt.plot(dates, kout['zsum_kb'] + kout['zsum_kb_err'], 'r:')
+#     plt.plot(dates, kout['zsum_kb'] - kout['zsum_kb_err'], 'r:')
+#     plt.show()
+#     
+#     
+#     plt.plot(dates, flx_ob, '0.5', linewidth=3)
+#     plt.plot(dates, kout['flx_kf'], 'k')
+#     plt.plot(dates, kout['flx_kf'] + kout['flx_kf_err'], 'k:')
+#     plt.plot(dates, kout['flx_kf'] - kout['flx_kf_err'], 'k:')
+#     
+#     plt.plot(dates, kout['flx_kb'], 'r')
+#     plt.plot(dates, kout['flx_kb'] + kout['flx_kb_err'], 'r:')
+#     plt.plot(dates, kout['flx_kb'] - kout['flx_kb_err'], 'r:')
+#     plt.show()
+#     
+#     plt.plot(dates, kout['tran_kf'], 'k')
+#     plt.plot(dates, kout['tran_kf'] + kout['tran_kf_err'], 'k:')
+#     plt.plot(dates, kout['tran_kf'] - kout['tran_kf_err'], 'k:')
+#     
+#     plt.plot(dates, kout['tran_kb'], 'r')
+#     plt.plot(dates, kout['tran_kb'] + kout['tran_kb_err'], 'r:')
+#     plt.plot(dates, kout['tran_kb'] - kout['tran_kb_err'], 'r:')
+#     
+#     plt.show()
 
-    plt.show()
-    
-    
-    plt.plot(flxs_bavg[0], 'k:')
-    plt.plot(flxs_bavg[1], 'k:')
-    
-    plt.plot(flxs_lp[0], 'g')
-    plt.plot(flxs_lp[1], 'g')
-    
-    #plt.plot(flx_ob, 'k')
-    plt.plot(flx_k, 'r')
-    plt.plot(flx_k + flx_k_err, 'r:')
-    plt.plot(flx_k - flx_k_err, 'r:')
-    #plt.plot(zsum_ob + zsum_ob_err * 1, 'k:')
-    #plt.plot(zsum_ob - zsum_ob_err * 1, 'k:'); plt.show()
 
-    plt.show()
-    
-        #plt.plot(zsums_lp[0], 'r')
-    #plt.plot(zsums_lp[1], 'r')
-    #plt.plot(tran_ob, 'k')
-    plt.plot(tran_k, 'r')
-    plt.plot(tran_k + tran_k_err, 'r:')
-    plt.plot(tran_k - tran_k_err, 'r:')
-    #plt.plot(zsum_ob + zsum_ob_err * 1, 'k:')
-    #plt.plot(zsum_ob - zsum_ob_err * 1, 'k:'); plt.show()
-
-    plt.show()
 
 def process_by_basin(config, zsums, flxs, basins, areas):
     """  For each basin, process data and invoke Kalman filter """
     
+    zsums, flxs, basins, areas = unify_masks(zsums, flxs, basins, areas)
     nbasins = np.unique(basins.data.filled())
     
     for nbasin in nbasins:
         if nbasin != basins.data.fill_value:
             process_basin(config, zsums, flxs, basins, areas, nbasin)
             
-            
+    if config.getboolean('kfilter', 'smooth'):
+        cutoff = config.getint('kfilter', 'cutoff')
+        save_template = zsums[0].copy()[cutoff/2:-cutoff/2]
+    else:
+        save_template = zsums[0].copy()
+    
+    save.save_as_netcdf(config, basins, save_template)        
+                
+    
+    
+    
 
 #     
 #      
