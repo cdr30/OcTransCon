@@ -5,8 +5,6 @@ Module containing routines to pre-process data and invoke Kalman filter.
 
 import numpy as np
 import scipy.signal
-import math
-
 import kalman
 import save
 
@@ -170,7 +168,9 @@ def process_basin(config, ohcs, flxs, basins, areas, nbasin):
     kout['flx_ob_err'] = flx_ob_err
     kout['ohc_ob_err'] = ohc_ob_err
     
-    save.save_temporary_file(config, kout, nbasin)
+    return kout
+    
+    #save.save_temporary_file(config, kout, nbasin)
     
     # Plot stuff - debugging
     
@@ -178,13 +178,13 @@ def process_basin(config, ohcs, flxs, basins, areas, nbasin):
 #     plt.plot(dates, kout['ohc_kfwd'], 'k')
 #     plt.plot(dates, kout['ohc_kfwd'] + kout['ohc_kfwd_err'], 'k:')
 #     plt.plot(dates, kout['ohc_kfwd'] - kout['ohc_kfwd_err'], 'k:')
-#     
+#      
 #     plt.plot(dates, kout['ohc_ksmooth'], 'r')
 #     plt.plot(dates, kout['ohc_ksmooth'] + kout['ohc_ksmooth_err'], 'r:')
 #     plt.plot(dates, kout['ohc_ksmooth'] - kout['ohc_ksmooth_err'], 'r:')
 #     plt.show()
-#     
-#     
+#      
+#      
 #     plt.plot(dates, flx_ob, '0.5', linewidth=3)
 #     plt.plot(dates, kout['flx_kfwd'], 'k')
 #     plt.plot(dates, kout['flx_kfwd'] + kout['flx_kfwd_err'], 'k:')
@@ -209,21 +209,25 @@ def process_basin(config, ohcs, flxs, basins, areas, nbasin):
 
 def process_by_basin(config, ohcs, flxs, basins, areas):
     """  For each basin, process data and invoke Kalman filter """
+
+    ### Create cubes for data output using ohc as template
+
     
-    ohcs, flxs, basins, areas = unify_masks(ohcs, flxs, basins, areas)
+    save_cubes = save.create_save_cubes(save_template)
+    
+    
+    ### 
     nbasins = np.unique(basins.data.filled())
     
     for nbasin in nbasins:
         if nbasin != basins.data.fill_value:
-            process_basin(config, ohcs, flxs, basins, areas, nbasin)
-            
-    if config.getboolean('kfilter', 'smooth'):
-        cutoff = config.getint('kfilter', 'cutoff')
-        save_template = ohcs[0].copy()[cutoff/2:-cutoff/2]
-    else:
-        save_template = ohcs[0].copy()
+            kout = process_basin(config, ohcs, flxs, basins, areas, nbasin)
     
-    save.save_as_netcdf(config, basins, save_template)        
+            save_cubes = save.add_
+            
+
+    
+    #save.save_as_netcdf(config, basins, save_template)        
                 
     
     

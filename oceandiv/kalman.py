@@ -22,7 +22,7 @@ def create_kalman_model(config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err):
     ### Estimate forward model errors
     ohc_fwd_err = np.std(ohc_ob) * 1.e-3             # Small, as conservation is accurate approximation.
     flx_fwd_err = np.std(flx_ob[1:] - flx_ob[:-1])   # Error in flux persistence assumption.
-    oht_fwd_err = flx_fwd_err * ohts_err_scale       # Scaled estimate of error in ohtsport persistence
+    oht_fwd_err = flx_fwd_err * oht_err_scale        # Scaled estimate of error in oht persistence
 
     ### Create observation matrices
     nmax = len(ohc_ob)

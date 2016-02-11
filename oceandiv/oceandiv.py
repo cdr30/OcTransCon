@@ -24,6 +24,7 @@ def main():
     areas = load.load_geodata(config, geotype='areas')
 
     # Process data 
+    ohcs, flxs, basins, areas = process.unify_masks(ohcs, flxs, basins, areas)
     process.process_by_basin(config, ohcs, flxs, basins, areas)
     
         
