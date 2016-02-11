@@ -1,5 +1,5 @@
 """
-Module containing main routines to execute TransConv.
+Module containing main routines to execute OceanDiv
 
 """
 
@@ -11,20 +11,20 @@ import process
 
 def main():
     """
-    Parse command line arguments and options and run TransConv.
+    Parse command line arguments and options and run OceanDiv.
     
     """
     args = parse_args.get_args()
     config = namelist.get_namelist(args)    
     
     # Load data
-    zsums = load.load_data(config, dtype='zsum')
-    flxs = load.load_data(config, dtype='flux')
+    ohcs = load.load_data(config, dtype='ohc')
+    flxs = load.load_data(config, dtype='flx')
     basins = load.load_geodata(config, geotype='basins')
     areas = load.load_geodata(config, geotype='areas')
 
     # Process data 
-    process.process_by_basin(config, zsums, flxs, basins, areas)
+    process.process_by_basin(config, ohcs, flxs, basins, areas)
     
         
         

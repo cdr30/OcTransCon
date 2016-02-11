@@ -11,9 +11,11 @@ def save_temporary_file(config, kout, nbasin):
     """ Save basin output as a temporary pickle file """
     
     tmpdir  = config.get('output', 'tmpdir')
-    tmpname = config.get('output', 'name')
+    tmpname = config.get('output', 'label')
     tmpf = '%s%s_basin%i.tmp' % (tmpdir, tmpname, nbasin)
+    
     print 'SAVING TEMPORARY FILE: ' + tmpf
+
     pickle.dump(kout, open(tmpf,'wb'))
 
 
@@ -31,11 +33,11 @@ def save_temporary_file(config, kout, nbasin):
 #     
 #     
 #     
-#     fwd_zsum = save_template.
+#     fwd_ohc = save_template.
 #     
 #     
-#     fwd_ohc, fwd_flx, fwd_trans
-#     bwd_ohc, bwd_flx, bwd_trans
+#     fwd_ohc, fwd_flx, fwd_ohts
+#     bwd_ohc, bwd_flx, bwd_ohts
 #     
 #     ohc_ob, flx_ob
 #     ohc_ob_err
@@ -46,23 +48,36 @@ def save_temporary_file(config, kout, nbasin):
 def save_as_netcdf(config, basins, save_template):
     """ Combine data from temporary files and save as netcdf files """
     
-    savevars = ['flx_kf', 'flx_kb', 'tran_kf', 'flx_ob',
-                 'zsum_kb_err', 'flx_ob_err', 'tran_kb', 'tran_kb_err',
-                 'flx_kb_err', 'zsum_kf', 'zsum_kf_err', 'zsum_kb',
-                 'flx_kf_err', 'zsum_ob', 'zsum_ob_err', 'tran_kf_err']
+    savevars = [('ohc_ob', 'J'),
+                ('ohc_ob_err', 'J'),
+                ('ohc_kfwd', 'J'),
+                ('ohc_kfwd_err', 'J'),
+                ('ohc_ksmooth', 'J'),
+                ('ohc_ksmooth_err', 'J'),
+                ('flx_ob', 'W'),
+                ('flx_ob_err', 'W'),
+                ('flx_kfwd', 'W'),
+                ('flx_kfwd_err', 'W'),
+                ('flx_ksmooth', 'W'),                
+                ('flx_ksmooth_err', 'W'),
+                ('oht_kfwd', 'W'),
+                ('oht_kfwd_err', 'W'),
+                ('oht_ksmooth', 'W'),
+                ('oht_ksmooth_err' 'W')]
+
+# FINISH CHANGING VAR NAMES AND NAME OF REPOSITORY AND CHECK THAT CODE STILL RUNS FOR NATL.    
+#   
     
     nbasins = np.unique(basins.data.filled())
     
     
-    for savevar in savevars:
-        varname = config.get('output', savevar.split('_')[0])
-        vartype = '_'.join(savevar.split('_')[1:])
-        print savevar, varname + '_' + vartype
+    for savevar, units in savevars:
+        print savevar, units
         
     
-    zsum_cube = save_template.copy()
-    zsum_cube.rename(config.get('output', 'zsum'))
-    zsum_cube.units = config.get('output', 'zsumunits')
+    ohc_cube = save_template.copy()
+    ohc_cube.rename(config.get('output', 'ohc'))
+    ohc_cube.units = config.get('output', 'ohcunits')
     
     for nbasin in nbasins:
         if nbasin != basins.data.fill_value:
@@ -78,13 +93,13 @@ def save_as_netcdf(config, basins, save_template):
             bind = np.where(basins.data.filled() == nbasin)
             
             #for j, i in zip(bind[0], bind[1]):
-            print zsum_cube.data[:, bind[0], bind[1]].shape
-            print kout['zsum_kb'][:, None].shape
-            zsum_cube.data[:, bind[0], bind[1]] = kout['zsum_kb'][:, None]
+            print ohc_cube.data[:, bind[0], bind[1]].shape
+            print kout['ohc_ksmooth'][:, None].shape
+            ohc_cube.data[:, bind[0], bind[1]] = kout['ohc_ksmooth'][:, None]
         
     fout = '/Users/chris_roberts/test.nc'
     print 'SAVING: ' + fout
-    iris.fileformats.netcdf.save(zsum_cube, fout)
+    iris.fileformats.netcdf.save(ohc_cube, fout)
         
         
         

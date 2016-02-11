@@ -12,7 +12,7 @@ def get_args():
     
     """
     parser = argparse.ArgumentParser(
-        description='Calculate ocean transport convergences.')
+        description='Calculate ocean heat transport divergences.')
     parser.add_argument(
         'namelist', type=str, help='Path to namelist.ini')
     args = parser.parse_args()

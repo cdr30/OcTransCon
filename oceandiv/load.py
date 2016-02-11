@@ -13,7 +13,7 @@ class ShapeError(Exception):
 
 
 def test_shape(cube, shape, label):
-    """ Raise Shaper error if cube.shape != shape """
+    """ Raise ShapeError if cube.shape != shape """
     
     if cube.shape != shape:
         raise ShapeError('Shape of %s must be %s, not %s ' % 
@@ -58,7 +58,7 @@ def load_geodata(config, geotype='areas'):
     return cube
 
 
-def load_data(config, dtype='zsum'):
+def load_data(config, dtype='ohc'):
     """ Return data as list of <iris.cube.Cube> objects"""
     
     cubes = []

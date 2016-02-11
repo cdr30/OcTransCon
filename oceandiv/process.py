@@ -51,15 +51,15 @@ def update_mask(cube, mask):
     return cube
     
     
-def unify_masks(zsums, flxs, basins, areas):
+def unify_masks(ohcs, flxs, basins, areas):
     """ Unify masked areas in all data sets. """
     
     masks = []
     masks = try_append_mask(basins.data, masks)
     masks = try_append_mask(areas.data, masks)
 
-    for zsum in zsums:
-        masks = try_append_mask(zsum[0].data, masks)
+    for ohc in ohcs:
+        masks = try_append_mask(ohc[0].data, masks)
         
     for flx in flxs:
         masks = try_append_mask(flx[0].data, masks)
@@ -72,9 +72,9 @@ def unify_masks(zsums, flxs, basins, areas):
     basins = update_mask(basins, new_mask)
     areas = update_mask(areas, new_mask)
     flxs = [update_mask(flx, new_mask) for flx in flxs]
-    zsums = [update_mask(zsum, new_mask) for zsum in zsums]
+    ohcs = [update_mask(ohc, new_mask) for ohc in ohcs]
     
-    return zsums, flxs, basins, areas
+    return ohcs, flxs, basins, areas
     
     
 def low_pass(input_signal, cutoff):
@@ -130,98 +130,98 @@ def calc_ermsd(datalist):
     return np.sqrt(ss/nk)
 
 
-def process_basin(config, zsums, flxs, basins, areas, nbasin):
+def process_basin(config, ohcs, flxs, basins, areas, nbasin):
     """ Pre-process data and invoke Kalman filter for the specified basin """
     
     # Extract dates
-    dates = return_dates(zsums[0])
+    dates = return_dates(ohcs[0])
     
     #Calc basin averages/totals
     use_total = config.getboolean('areas', 'calc_basin_totals')
-    zsums_bavg = [calc_basin_avg(cube, basins, areas, nbasin, total=use_total) for cube in zsums]
+    ohcs_bavg = [calc_basin_avg(cube, basins, areas, nbasin, total=use_total) for cube in ohcs]
     flxs_bavg = [calc_basin_avg(cube, basins, areas, nbasin, total=use_total) for cube in flxs]
 
     # Low pass data
     if config.getboolean('kfilter', 'smooth'):
         cutoff = config.getint('kfilter', 'cutoff')
         dates = dates[cutoff/2:-cutoff/2]
-        zsums_bavg = [low_pass(dat, cutoff) for dat in zsums_bavg]
+        ohcs_bavg = [low_pass(dat, cutoff) for dat in ohcs_bavg]
         flxs_bavg = [low_pass(dat, cutoff) for dat in flxs_bavg]
     
-    #Reference zsum data to zero at t0.
-    zsums_bavg = [dat - dat[0] for dat in zsums_bavg]
+    #Reference ohc data to zero at t0.
+    ohcs_bavg = [dat - dat[0] for dat in ohcs_bavg]
     
     # Calculate ensemble means
     flx_ob = calc_ensemble_mean(flxs_bavg)
-    zsum_ob = calc_ensemble_mean(zsums_bavg)
+    ohc_ob = calc_ensemble_mean(ohcs_bavg)
     
     # Calculate obs errors
     flx_ob_err = calc_ermsd(flxs_bavg)
-    zsum_ob_err = calc_ermsd(zsums_bavg)
+    ohc_ob_err = calc_ermsd(ohcs_bavg)
     
     # Apply Kalman smoother
-    kout = kalman.apply_ksmooth(config, flx_ob, zsum_ob, flx_ob_err, zsum_ob_err)
+    kout = kalman.apply_ksmooth(config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err)
     
     # Write data to temporary file
     print 'Processing basin %i' % nbasin
     kout['dates'] = dates
     kout['flx_ob'] = flx_ob
-    kout['zsum_ob'] = zsum_ob
+    kout['ohc_ob'] = ohc_ob
     kout['flx_ob_err'] = flx_ob_err
-    kout['zsum_ob_err'] = zsum_ob_err
+    kout['ohc_ob_err'] = ohc_ob_err
     
     save.save_temporary_file(config, kout, nbasin)
     
     # Plot stuff - debugging
     
-#     plt.plot(dates, zsum_ob, '0.5', linewidth=3)
-#     plt.plot(dates, kout['zsum_kf'], 'k')
-#     plt.plot(dates, kout['zsum_kf'] + kout['zsum_kf_err'], 'k:')
-#     plt.plot(dates, kout['zsum_kf'] - kout['zsum_kf_err'], 'k:')
+#     plt.plot(dates, ohc_ob, '0.5', linewidth=3)
+#     plt.plot(dates, kout['ohc_kfwd'], 'k')
+#     plt.plot(dates, kout['ohc_kfwd'] + kout['ohc_kfwd_err'], 'k:')
+#     plt.plot(dates, kout['ohc_kfwd'] - kout['ohc_kfwd_err'], 'k:')
 #     
-#     plt.plot(dates, kout['zsum_kb'], 'r')
-#     plt.plot(dates, kout['zsum_kb'] + kout['zsum_kb_err'], 'r:')
-#     plt.plot(dates, kout['zsum_kb'] - kout['zsum_kb_err'], 'r:')
+#     plt.plot(dates, kout['ohc_ksmooth'], 'r')
+#     plt.plot(dates, kout['ohc_ksmooth'] + kout['ohc_ksmooth_err'], 'r:')
+#     plt.plot(dates, kout['ohc_ksmooth'] - kout['ohc_ksmooth_err'], 'r:')
 #     plt.show()
 #     
 #     
 #     plt.plot(dates, flx_ob, '0.5', linewidth=3)
-#     plt.plot(dates, kout['flx_kf'], 'k')
-#     plt.plot(dates, kout['flx_kf'] + kout['flx_kf_err'], 'k:')
-#     plt.plot(dates, kout['flx_kf'] - kout['flx_kf_err'], 'k:')
+#     plt.plot(dates, kout['flx_kfwd'], 'k')
+#     plt.plot(dates, kout['flx_kfwd'] + kout['flx_kfwd_err'], 'k:')
+#     plt.plot(dates, kout['flx_kfwd'] - kout['flx_kfwd_err'], 'k:')
 #     
-#     plt.plot(dates, kout['flx_kb'], 'r')
-#     plt.plot(dates, kout['flx_kb'] + kout['flx_kb_err'], 'r:')
-#     plt.plot(dates, kout['flx_kb'] - kout['flx_kb_err'], 'r:')
+#     plt.plot(dates, kout['flx_ksmooth'], 'r')
+#     plt.plot(dates, kout['flx_ksmooth'] + kout['flx_ksmooth_err'], 'r:')
+#     plt.plot(dates, kout['flx_ksmooth'] - kout['flx_ksmooth_err'], 'r:')
 #     plt.show()
 #     
-#     plt.plot(dates, kout['tran_kf'], 'k')
-#     plt.plot(dates, kout['tran_kf'] + kout['tran_kf_err'], 'k:')
-#     plt.plot(dates, kout['tran_kf'] - kout['tran_kf_err'], 'k:')
+#     plt.plot(dates, kout['oht_kfwd'], 'k')
+#     plt.plot(dates, kout['oht_kfwd'] + kout['oht_kfwd_err'], 'k:')
+#     plt.plot(dates, kout['oht_kfwd'] - kout['oht_kfwd_err'], 'k:')
 #     
-#     plt.plot(dates, kout['tran_kb'], 'r')
-#     plt.plot(dates, kout['tran_kb'] + kout['tran_kb_err'], 'r:')
-#     plt.plot(dates, kout['tran_kb'] - kout['tran_kb_err'], 'r:')
+#     plt.plot(dates, kout['oht_ksmooth'], 'r')
+#     plt.plot(dates, kout['oht_ksmooth'] + kout['oht_ksmooth_err'], 'r:')
+#     plt.plot(dates, kout['oht_ksmooth'] - kout['oht_ksmooth_err'], 'r:')
 #     
 #     plt.show()
 
 
 
-def process_by_basin(config, zsums, flxs, basins, areas):
+def process_by_basin(config, ohcs, flxs, basins, areas):
     """  For each basin, process data and invoke Kalman filter """
     
-    zsums, flxs, basins, areas = unify_masks(zsums, flxs, basins, areas)
+    ohcs, flxs, basins, areas = unify_masks(ohcs, flxs, basins, areas)
     nbasins = np.unique(basins.data.filled())
     
     for nbasin in nbasins:
         if nbasin != basins.data.fill_value:
-            process_basin(config, zsums, flxs, basins, areas, nbasin)
+            process_basin(config, ohcs, flxs, basins, areas, nbasin)
             
     if config.getboolean('kfilter', 'smooth'):
         cutoff = config.getint('kfilter', 'cutoff')
-        save_template = zsums[0].copy()[cutoff/2:-cutoff/2]
+        save_template = ohcs[0].copy()[cutoff/2:-cutoff/2]
     else:
-        save_template = zsums[0].copy()
+        save_template = ohcs[0].copy()
     
     save.save_as_netcdf(config, basins, save_template)        
                 
@@ -246,7 +246,7 @@ def process_by_basin(config, zsums, flxs, basins, areas):
 #         
 #          Calculate ensemble  means
 #         
-#          Pass observed flx and zsum to Kalman filter.
+#          Pass observed flx and ohc to Kalman filter.
 #         
 #          Apply Kalman filter and extract values
 #         
