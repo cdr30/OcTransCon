@@ -6,9 +6,7 @@ Module containing routines to pre-process data and invoke Kalman filter.
 import numpy as np
 import scipy.signal
 import kalman
-import save
-
-import matplotlib.pyplot as plt
+import tools
 
 
 class ShapeError(Exception):
@@ -25,7 +23,7 @@ def return_dates(cube):
     
 
 def try_append_mask(data, masks):
-    """ Attempt to append data.mask to masks """
+    """ Attempt to append data.mask to list of masks """
     
     try:
         masks.append(data.mask)
@@ -160,8 +158,7 @@ def process_basin(config, ohcs, flxs, basins, areas, nbasin):
     # Apply Kalman smoother
     kout = kalman.apply_ksmooth(config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err)
     
-    # Write data to temporary file
-    print 'Processing basin %i' % nbasin
+    # Append data to output dictionary
     kout['dates'] = dates
     kout['flx_ob'] = flx_ob
     kout['ohc_ob'] = ohc_ob
@@ -169,93 +166,97 @@ def process_basin(config, ohcs, flxs, basins, areas, nbasin):
     kout['ohc_ob_err'] = ohc_ob_err
     
     return kout
-    
-    #save.save_temporary_file(config, kout, nbasin)
-    
-    # Plot stuff - debugging
-    
-#     plt.plot(dates, ohc_ob, '0.5', linewidth=3)
-#     plt.plot(dates, kout['ohc_kfwd'], 'k')
-#     plt.plot(dates, kout['ohc_kfwd'] + kout['ohc_kfwd_err'], 'k:')
-#     plt.plot(dates, kout['ohc_kfwd'] - kout['ohc_kfwd_err'], 'k:')
-#      
-#     plt.plot(dates, kout['ohc_ksmooth'], 'r')
-#     plt.plot(dates, kout['ohc_ksmooth'] + kout['ohc_ksmooth_err'], 'r:')
-#     plt.plot(dates, kout['ohc_ksmooth'] - kout['ohc_ksmooth_err'], 'r:')
-#     plt.show()
-#      
-#      
-#     plt.plot(dates, flx_ob, '0.5', linewidth=3)
-#     plt.plot(dates, kout['flx_kfwd'], 'k')
-#     plt.plot(dates, kout['flx_kfwd'] + kout['flx_kfwd_err'], 'k:')
-#     plt.plot(dates, kout['flx_kfwd'] - kout['flx_kfwd_err'], 'k:')
-#     
-#     plt.plot(dates, kout['flx_ksmooth'], 'r')
-#     plt.plot(dates, kout['flx_ksmooth'] + kout['flx_ksmooth_err'], 'r:')
-#     plt.plot(dates, kout['flx_ksmooth'] - kout['flx_ksmooth_err'], 'r:')
-#     plt.show()
-#     
-#     plt.plot(dates, kout['oht_kfwd'], 'k')
-#     plt.plot(dates, kout['oht_kfwd'] + kout['oht_kfwd_err'], 'k:')
-#     plt.plot(dates, kout['oht_kfwd'] - kout['oht_kfwd_err'], 'k:')
-#     
-#     plt.plot(dates, kout['oht_ksmooth'], 'r')
-#     plt.plot(dates, kout['oht_ksmooth'] + kout['oht_ksmooth_err'], 'r:')
-#     plt.plot(dates, kout['oht_ksmooth'] - kout['oht_ksmooth_err'], 'r:')
-#     
-#     plt.show()
 
+
+def create_output_cubes(config, output_template):
+    """ Create cubes for data output """
+    
+    outvars = [('ohc_ob', 'J', 3),
+               ('ohc_ob_err', 'J', 2),
+               ('ohc_kfwd', 'J', 3),
+               ('ohc_kfwd_err', 'J', 3),
+               ('ohc_ksmooth', 'J', 3),
+               ('ohc_ksmooth_err', 'J', 3),
+               ('flx_ob', 'W', 3),
+               ('flx_ob_err', 'W', 2),
+               ('flx_kfwd', 'W', 3),
+               ('flx_kfwd_err', 'W', 3),
+               ('flx_ksmooth', 'W', 3),                
+               ('flx_ksmooth_err', 'W', 3),
+               ('oht_kfwd', 'W', 3),
+               ('oht_kfwd_err', 'W', 3),
+               ('oht_ksmooth', 'W', 3),
+               ('oht_ksmooth_err', 'W', 3)]
+    
+    out_cubes = {}
+    
+    for outvar, outunit, outdim in outvars:
+        if outdim == 2:
+            out_cube = output_template.copy()[0]
+        elif outdim == 3:
+            out_cube = output_template.copy()
+    
+        if not config.getboolean('areas', 'calc_basin_totals'):
+            outunit += '/m2'
+    
+        out_cube.rename(outvar)
+        out_cube.units = outunit
+        out_cubes[outvar] = out_cube
+    
+    return out_cubes
+
+
+def update_output_cubes(out_cubes, kout, basins, nbasin):
+    """ 
+    Update cubes with Kalman filter output for the specified basin in cubes.
+    
+    """
+
+    for key in out_cubes.keys():
+        cube = out_cubes[key]  
+        bind = np.where(basins.data.filled() == nbasin)
+        
+        if len(cube.shape) == 3:
+            cube.data[:, bind[0], bind[1]] = kout[key][:, None]
+        elif len(cube.shape) == 2:
+            cube.data[bind[0], bind[1]] = kout[key]
+            
+        out_cubes[key] = cube
+
+    return out_cubes
+
+
+def create_output_template(config, cube):
+    """ 
+    Create output cube and, if necessary, trim time axis 
+    to account for low pass filtering. 
+    
+    """
+    if config.getboolean('kfilter', 'smooth'):
+        cutoff = config.getint('kfilter', 'cutoff')
+        output_template = cube[cutoff/2:-cutoff/2].copy()
+    else:
+        output_template = cube.copy()
+        
+    return output_template
 
 
 def process_by_basin(config, ohcs, flxs, basins, areas):
     """  For each basin, process data and invoke Kalman filter """
-
+        
     ### Create cubes for data output using ohc as template
+    output_template = create_output_template(config, ohcs[0])
+    out_cubes = create_output_cubes(config, output_template)
 
-    
-    save_cubes = save.create_save_cubes(save_template)
-    
-    
-    ### 
-    nbasins = np.unique(basins.data.filled())
-    
-    for nbasin in nbasins:
+    ### Process basins
+    nbasins = np.unique(basins.data.filled())    
+    for ntask, nbasin in enumerate(nbasins):
+        if config.getboolean('output', 'print_stdout'): 
+            tools.print_progress('Processing basins', len(nbasins), ntask+1, nbar=20)   
         if nbasin != basins.data.fill_value:
             kout = process_basin(config, ohcs, flxs, basins, areas, nbasin)
-    
-            save_cubes = save.add_
+            out_cubes = update_output_cubes(out_cubes, kout, basins, nbasin)
             
+    return out_cubes
 
-    
-    #save.save_as_netcdf(config, basins, save_template)        
-                
-    
-    
-    
 
-#     
-#      
-#      Copy cubes to store ksmoothed OHC, Flx and OHT and associated errors.
-# 
-#      Find list of unique basins
-#     nbasins = find_nbasins(config, basins)
-#     
-#     for nbasin in nbasins:
-#         
-#          Extract area-weighted basin data
-# 
-#          Smooth data
-#         
-#          Calculate obs errors
-#         
-#          Calculate ensemble  means
-#         
-#          Pass observed flx and ohc to Kalman filter.
-#         
-#          Apply Kalman filter and extract values
-#         
-#          Insert data into cubes
-#         pass
-#     
-#      Save cubes.
-        

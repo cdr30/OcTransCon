@@ -1,6 +1,6 @@
 """
 Module containing routines and model definitions for the application 
-of a Kalman smoothing algorithm.
+of Kalman filter and RTS smoother.
 
 """
 
@@ -11,7 +11,7 @@ def create_kalman_model(config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err):
     """
     Return the matrices and initial state vectors for implementation of a 
     Kalman filter. Forward model predictions of OHC obey heat conservation.
-    Initial estimates of oht and flx assume persistence of the previous anomaly.
+    Initial estimates of oht and flx assume persistence of previous anomalies.
     
     """
     
@@ -71,7 +71,7 @@ def create_kalman_model(config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err):
 
 def kalman_smooth(A, Q, Gamma, y, E, R, P0, x0):
     """
-    Apply forward kalman filter and backward RTS smoother using
+    Apply forward Kalman filter and backward RTS smoother using
     specified linear model and data matrices.
     
     """
@@ -118,7 +118,7 @@ def kalman_smooth(A, Q, Gamma, y, E, R, P0, x0):
 
 
 def apply_ksmooth(config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err):
-    """ Apply Kalman filter to the specified data. """
+    """ Generate model, apply Kalman filter, and return output as a dictionary. """
     
     A, Q, Gamma, y, E, R, P0, x0 = create_kalman_model(
         config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err)

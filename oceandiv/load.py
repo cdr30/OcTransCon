@@ -1,5 +1,6 @@
 """
-Module containing routines to load netcdf data into <iris.cube.Cube>
+Module containing routines to load netcdf data and return as 
+<iris.cube.Cube> structures.
 
 """
 
@@ -12,16 +13,16 @@ class ShapeError(Exception):
     pass
 
 
-def test_shape(cube, shape, label):
+def test_shape(cube, shape, name):
     """ Raise ShapeError if cube.shape != shape """
     
     if cube.shape != shape:
         raise ShapeError('Shape of %s must be %s, not %s ' % 
-                         (label, repr(shape), repr(cube.shape)))
+                         (name, repr(shape), repr(cube.shape)))
 
 
 def load_cube(f, ncvar):
-    """ Return specified netcdf variable as an <iris.cube.Cube> """
+    """ Return specified netcdf variable in <iris.cube.Cube> """
     
     var_constraint = iris.Constraint(cube_func=lambda c:
                                      c.var_name == ncvar)
@@ -31,7 +32,7 @@ def load_cube(f, ncvar):
 
 
 def mask_cube(cube, mdi):
-    """ Return cube following application of mask where data == mdi """
+    """ Return cube with data attribute as <np.ma.MaskedArray>"""
     
     mask = (cube.data == mdi)
     cube.data = np.ma.MaskedArray(cube.data, mask=mask, fill_value=mdi)
@@ -40,7 +41,7 @@ def mask_cube(cube, mdi):
 
 
 def load_geodata(config, geotype='areas'):
-    """ Return geographic data as an <iris.cube.Cube> """
+    """ Load geographic data and return as an <iris.cube.Cube> """
     
     datadir = config.get(geotype, 'dir')
     f = config.get(geotype, 'f')
@@ -59,7 +60,7 @@ def load_geodata(config, geotype='areas'):
 
 
 def load_data(config, dtype='ohc'):
-    """ Return data as list of <iris.cube.Cube> objects"""
+    """ Load all data sources and return as a list of <iris.cube.Cube> """
     
     cubes = []
     ncubes = config.getint('metadata', 'n%s' % (dtype))
