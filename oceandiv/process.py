@@ -112,7 +112,7 @@ def calc_ensemble_mean(datalist):
     return mn/len(datalist)
 
  
-def calc_ermsd(datalist):
+def calc_ermsd(datalist, err_tol=1e-6):
     """ Return ensemble root-mean-square deviation for data in datalist"""
     
     mn = calc_ensemble_mean(datalist)
@@ -123,7 +123,12 @@ def calc_ermsd(datalist):
     
     nk = len(datalist) * len(datalist[0])
     
-    return np.sqrt(ss/nk)
+    ermsd = np.sqrt(ss/nk)
+    
+    if ermsd < err_tol:
+        raise ValueError('RMSD between obs must be > %f for uncertainty estimates' % err_tol)
+    
+    return ermsd
 
 
 def process_basin(config, ohcs, flxs, basins, areas, nbasin):
