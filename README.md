@@ -1,4 +1,5 @@
-# OceanDiv
+# OceanDiv v0.1 
+
 OceanDiv is a tool for quantifying smoothly varying ocean heat transport divergences (convergences) from estimates of ocean heat content, net surface heat fluxes, and their associated uncertianties. 
 
 ## Methodology
