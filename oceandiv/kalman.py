@@ -6,41 +6,76 @@ of Kalman filter and RTS smoother.
 
 import numpy as np
 
+from numpy import mean, sqrt, square
 
-def create_kalman_model(config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err):
+
+def rate_persistence_err(dat):
+    """ 
+    Returns error in forward model assuming persistence
+    of rates of change. 
+    """
+    tru = dat[2:]
+    rate_per = 2 * dat[1:-1] - dat[0:-2]
+    diff = tru - rate_per
+    rms = sqrt(mean(square(diff)))
+    
+    return rms
+
+
+def anom_persistence_err(dat):
+    """ 
+    Returns error in forward model assuming persistence
+    of anomalies 
+    """
+    tru = dat[1:]
+    anom_per = dat[:-1]
+    diff = tru - anom_per
+    rms = sqrt(mean(square(diff)))
+    
+    return rms
+
+
+def create_kalman_model(config, flx_ob, ohc_ob, oht_ob, flx_ob_err, ohc_ob_err):
     """
     Return the matrices and initial state vectors for implementation of a 
     Kalman filter. Forward model predictions of OHC obey heat conservation.
-    Initial estimates of oht and flx assume persistence of previous anomalies.
+    Initial estimates of oht and flx assume persistence of rates of change.
     
     """
     
-    ### Read configuration options.
-    dt = config.getfloat('kfilter', 'dt')
-    oht_err_scale = config.getfloat('kfilter', 'oht_error_scaling')
-    
-    ### Estimate forward model errors
-    ohc_fwd_err = np.std(ohc_ob) * 1.e-3             # Small, as conservation is accurate approximation.
-    flx_fwd_err = np.std(flx_ob[1:] - flx_ob[:-1])   # Error in flux persistence assumption.
-    oht_fwd_err = flx_fwd_err * oht_err_scale        # Scaled estimate of error in oht persistence
-
     ### Create observation matrices
+    dt = config.getfloat('kfilter', 'dt')
     nmax = len(ohc_ob)
     y = [np.matrix([ohc_ob[n], flx_ob[n]]).T for n in range(nmax)]
     E = np.matrix([[1, 0, 0, 0, 0, 0, 0, 0],
                    [0, 0, 0, 1, 0, 0, 0, 0]])
     R = np.matrix([[ohc_ob_err**2, 0],[0, flx_ob_err**2]])
 
-    ### Create forward model matrices
-    A = np.matrix([[0, 1, 0.5*dt, dt, 0.5*dt, 0.5*dt, dt, 0.5*dt],
-                   [1, 0, 0, 0, 0, 0, 0, 0],
-                   [0, 0, 1, 0, 0, 0, 0, 0],
-                   [0, 0, 1, 0, 0, 0, 0, 0],
-                   [0, 0, 0, 1, 0, 0, 0, 0],
-                   [0, 0, 0, 0, 0, 1, 0, 0],
-                   [0, 0, 0, 0, 0, 1, 0, 0],
-                   [0, 0, 0, 0, 0, 0, 1, 0]])
+    ### Create forward model matrices   
+    if config.getboolean('kfilter', 'use_rate_persistence'): # Using rate persistence 
+        flx_fwd_err = rate_persistence_err(flx_ob)        
+        oht_fwd_err = rate_persistence_err(oht_ob) 
+        A = np.matrix([[0, 1, 0.5*dt, dt, 0.5*dt, 0.5*dt, dt, 0.5*dt],
+                       [1, 0, 0, 0, 0, 0, 0, 0],
+                       [0, 0, 2, -1, 0, 0, 0, 0],
+                       [0, 0, 1, 0, 0, 0, 0, 0],
+                       [0, 0, 0, 1, 0, 0, 0, 0],
+                       [0, 0, 0, 0, 0, 2, -1, 0],
+                       [0, 0, 0, 0, 0, 1, 0, 0],
+                       [0, 0, 0, 0, 0, 0, 1, 0]])
+    else: # Using anomaly persistence 
+        flx_fwd_err = anom_persistence_err(flx_ob)        
+        oht_fwd_err = anom_persistence_err(oht_ob) 
+        A = np.matrix([[0, 1, 0.5*dt, dt, 0.5*dt, 0.5*dt, dt, 0.5*dt],
+                       [1, 0, 0, 0, 0, 0, 0, 0],
+                       [0, 0, 1, 0, 0, 0, 0, 0],
+                       [0, 0, 1, 0, 0, 0, 0, 0],
+                       [0, 0, 0, 1, 0, 0, 0, 0],
+                       [0, 0, 0, 0, 0, 1, 0, 0],
+                       [0, 0, 0, 0, 0, 1, 0, 0],
+                       [0, 0, 0, 0, 0, 0, 1, 0]])
 
+    ohc_fwd_err = np.std(ohc_ob) * 1.e-3
     Q = np.matrix([[ohc_fwd_err**2, 0, 0, 0, 0, 0, 0, 0],
                    [0, 0, 0, 0, 0, 0, 0, 0],
                    [0, 0, flx_fwd_err**2, 0, 0, 0, 0, 0],
@@ -49,7 +84,6 @@ def create_kalman_model(config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err):
                    [0, 0, 0, 0, 0, oht_fwd_err**2, 0, 0],
                    [0, 0, 0, 0, 0, 0, 0, 0],
                    [0, 0, 0, 0, 0, 0, 0, 0]])
-
     Gamma = np.matrix(np.identity(8))
 
     ### Initialize state vectors
@@ -117,11 +151,11 @@ def kalman_smooth(A, Q, Gamma, y, E, R, P0, x0):
     return x_fwd, P_fwd, x_bwd, P_bwd
 
 
-def apply_ksmooth(config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err):
+def apply_ksmooth(config, flx_ob, ohc_ob, oht_ob, flx_ob_err, ohc_ob_err):
     """ Generate model, apply Kalman filter, and return output as a dictionary. """
     
     A, Q, Gamma, y, E, R, P0, x0 = create_kalman_model(
-        config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err)
+        config, flx_ob, ohc_ob, oht_ob, flx_ob_err, ohc_ob_err)
     x_fwd, P_fwd, x_bwd, P_bwd = kalman_smooth(A, Q, Gamma, y, E, R, P0, x0)
    
     ### Extract results from state matrices

@@ -12,7 +12,6 @@ import tools
 class ShapeError(Exception):
     pass
 
-
 def return_dates(cube):
     """ Return array of <datetime.datetime> objects. """
     
@@ -131,6 +130,16 @@ def calc_ermsd(datalist, err_tol=1e-6):
     return ermsd
 
 
+def calc_div_oht_nokalman(config, ohc, flx):
+    """ Make initial estimate of OHT without using Kalman filter. """ 
+
+    dt = config.getfloat('kfilter', 'dt')
+    dohc = (ohc[2:] - ohc[:-2]) / (2. * dt)
+    doht = dohc - flx[1:-1]
+
+    return doht
+
+
 def process_basin(config, ohcs, flxs, basins, areas, nbasin):
     """ Pre-process data and invoke Kalman filter for the specified basin """
     
@@ -154,21 +163,28 @@ def process_basin(config, ohcs, flxs, basins, areas, nbasin):
     
     # Calculate ensemble means
     flx_ob = calc_ensemble_mean(flxs_bavg)
-    ohc_ob = calc_ensemble_mean(ohcs_bavg)
+    ohc_ob = calc_ensemble_mean(ohcs_bavg)   
     
     # Calculate obs errors
-    flx_ob_err = calc_ermsd(flxs_bavg)
-    ohc_ob_err = calc_ermsd(ohcs_bavg)
+    flx_ob_err = calc_ermsd(flxs_bavg) * config.getfloat('kfilter', 'ob_error_scale')
+    ohc_ob_err = calc_ermsd(ohcs_bavg) * config.getfloat('kfilter', 'ob_error_scale')
+    
+    # Make initial estimate of OHT without using Kalman filter.    
+    oht_no_kalman = calc_div_oht_nokalman(config, ohc_ob, flx_ob)     
+    oht_ob = oht_no_kalman
     
     # Apply Kalman smoother
-    kout = kalman.apply_ksmooth(config, flx_ob, ohc_ob, flx_ob_err, ohc_ob_err)
-    
+    for niter in range(config.getint('kfilter', 'iterations')):
+        kout = kalman.apply_ksmooth(config, flx_ob, ohc_ob, oht_ob, flx_ob_err, ohc_ob_err)
+        oht_ob = kout['oht_ksmooth']
+        
     # Append data to output dictionary
     kout['dates'] = dates
     kout['flx_ob'] = flx_ob
     kout['ohc_ob'] = ohc_ob
     kout['flx_ob_err'] = flx_ob_err
     kout['ohc_ob_err'] = ohc_ob_err
+    kout['oht_no_kalman'] = oht_no_kalman 
     
     return kout
 
@@ -188,6 +204,7 @@ def create_output_cubes(config, output_template):
                ('flx_kfwd_err', 'W', 3),
                ('flx_ksmooth', 'W', 3),                
                ('flx_ksmooth_err', 'W', 3),
+               ('oht_no_kalman', 'W', 3),
                ('oht_kfwd', 'W', 3),
                ('oht_kfwd_err', 'W', 3),
                ('oht_ksmooth', 'W', 3),
@@ -199,7 +216,10 @@ def create_output_cubes(config, output_template):
         if outdim == 2:
             out_cube = output_template.copy()[0]
         elif outdim == 3:
-            out_cube = output_template.copy()
+            if outvar == 'oht_no_kalman':
+                out_cube = output_template.copy()[1:-1]
+            else:
+                out_cube = output_template.copy()
     
         if not config.getboolean('areas', 'calc_basin_totals'):
             outunit += '/m2'

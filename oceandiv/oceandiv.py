@@ -23,12 +23,13 @@ def main():
         print '\nRunning OceanDiv...\n' 
     
     # Load data
+    if config.getboolean('output', 'print_stdout'): 
+        print 'Loading data...\n'
+    
     ohcs = load.load_data(config, dtype='ohc')
     flxs = load.load_data(config, dtype='flx')
     basins = load.load_geodata(config, geotype='basins')
     areas = load.load_geodata(config, geotype='areas')
-    if config.getboolean('output', 'print_stdout'): 
-        tools.print_progress('Loading data', nmax=1, n=1, nbar=20)
 
     # Process data 
     ohcs, flxs, basins, areas = process.unify_masks(ohcs, flxs, basins, areas)
