@@ -1,6 +1,6 @@
-# OceanDiv v0.1 
+# OceanDiv v0.2 
 
-OceanDiv is a tool for quantifying smoothly varying ocean heat transport divergences (convergences) from estimates of ocean heat content, net surface heat fluxes, and their associated uncertianties. 
+OceanDiv is a tool for quantifying smoothly varying ocean heat transport convergences from observed ocean heat content, net surface heat fluxes, and their associated uncertianties. 
 
 ## Methodology
 OceanDiv uses a forward Kalman filter and backward Rauch–Tung–Striebel smoother to estimate ocean heat transport convergences (HTC) from observations of full-column ocean heat content (OHC) and net surface heat fluxes. A [Kaman filter](https://en.wikipedia.org/wiki/Kalman_filter) is a way of combining predictions from a model with uncertain observations to generate an improved state estimate with associated uncertainties. The use of the RTS smoother allows each estimate of HTC(t) using all available (past and future) OHC and surface flux observations. This methodology is similar to that employed by Kelly et al. ([2014](http://journals.ametsoc.org/doi/abs/10.1175/JCLI-D-12-00131.1)) with some key differences in the treatment of uncertainties and the way that HTC is explitly incorporated into the Kalman filter state transition matrix. In order to run OceanDiv, it is necessary to provide at least two different estimates of each observed quantity (ocean heat content and net surface heat flux) as the discrepancies between different products are used to estimate observational uncertainties. 
@@ -49,9 +49,9 @@ calc_basin_totals = False # Boolean flag to switch on/off use of area totals. De
 smooth = True # Boolean flag that switches on/off application of a low-pass Butterworth filter prior to Kalman filter.
 cutoff = 12 # Time window used for low-pass filter. 
 dt = 2629800.0 # Duration (in seconds) of each data point (2629800.0  = 1 month).  
-oht_error_scaling = 2 # Scale factor used to estimate uncertainty in persistence of heat
-                      # transport convergence as a multiple of the uncertainty in the persistence
-                      # of net surface fluxes (default = 2). 
+fwd_model = RATE_PERSISTENCE #   Forward model used to estimate HTC and fluxes priod to observational update. Choose from CLIMATOLOGY | PERSISTENCE | RATE_PERSISTENCE
+ob_error_scale = 1 # Used to inflate/deflate estimated observational uncertainties (default=1)
+iterations = 1 # Number of iterations performed to estimate the uncertainty associated with the chosen forward model (default=1)
 
 [ohc1] # Details of OHC data set number 1
 dir = /Users/chris_roberts/data/energy_flows/ # Path to data
