@@ -19,13 +19,10 @@ def main():
     # Read options
     args = parse_args.get_args()
     config = namelist.get_namelist(args)
-    if config.getboolean('output', 'print_stdout'): 
-        print '\nRunning OceanDiv...\n' 
+    tools.print_message(config, 'Running OceanDiv...')
     
     # Load data
-    if config.getboolean('output', 'print_stdout'): 
-        print 'Loading data...\n'
-    
+    tools.print_message(config, 'Loading data...')
     ohcs = load.load_data(config, dtype='ohc')
     flxs = load.load_data(config, dtype='flx')
     basins = load.load_geodata(config, geotype='basins')
@@ -39,8 +36,7 @@ def main():
     save.save_as_netcdf(config, out_cubes)
     
     # Finished
-    if config.getboolean('output', 'print_stdout'): 
-        print '\n\nFinished!\n\n'
-    
+    tools.print_message(config, 'Finished!')
+
         
     

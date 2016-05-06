@@ -6,6 +6,12 @@ Useful functions
 import numpy as np
 
 
+def print_message(config, msg):
+    """ Print message to standard output """
+    if config.getboolean('output', 'print_stdout'): 
+        print '\n%s\n' % (msg) 
+
+
 def print_progress(task_name, nmax, n, nbar=20):
     """ Print progress to standard out. """
     

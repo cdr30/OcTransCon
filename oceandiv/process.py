@@ -278,6 +278,7 @@ def process_by_basin(config, ohcs, flxs, basins, areas):
     for ntask, nbasin in enumerate(nbasins):
         if config.getboolean('output', 'print_stdout'): 
             tools.print_progress('Processing basins', len(nbasins), ntask+1, nbar=20)   
+            
         if nbasin != basins.data.fill_value:
             kout = process_basin(config, ohcs, flxs, basins, areas, nbasin)
             out_cubes = update_output_cubes(out_cubes, kout, basins, nbasin)
