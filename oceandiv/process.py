@@ -108,7 +108,7 @@ def calc_ensemble_mean(datalist):
     for dat in datalist:
         mn += dat
         
-    return mn/len(datalist)
+    return mn/np.float(len(datalist))
 
  
 def calc_ermsd(datalist, err_tol=1e-6):
@@ -124,8 +124,8 @@ def calc_ermsd(datalist, err_tol=1e-6):
     
     ermsd = np.sqrt(ss/nk)
     
-    if ermsd < err_tol:
-        raise ValueError('RMSD between obs must be > %f for uncertainty estimates' % err_tol)
+    if ermsd < err_tol * np.mean(mn):
+        raise ValueError('RMSD between obs must be > %f for uncertainty estimates' % err_tol * np.mean(mn))
     
     return ermsd
 
